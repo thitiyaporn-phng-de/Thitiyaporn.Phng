@@ -1,0 +1,152 @@
+import boto3
+import csv
+import pymysql
+from io import StringIO
+
+# =========================
+# CONFIG
+# =========================
+S3_BUCKET = "shipment-transections"
+S3_PREFIX = "curated/"
+
+RDS_HOST = "shipment-transection-mysql.cizzo7bgm3ov.us-east-1.rds.amazonaws.com"
+RDS_PORT = 3306
+
+DB_NAME = "shipment_last_data_mysql"
+DB_USER = "admin"
+DB_PASSWORD = "Password2568**"
+
+TABLE_NAME = "shipments"
+# =========================
+# AWS CLIENT
+# =========================
+
+s3 = boto3.client("s3")
+# =========================
+# LAMBDA HANDLER
+# =========================
+def lambda_handler(event, context):
+    connection = None
+    try:
+        # =========================
+        # CONNECT MYSQL
+        # =========================
+        connection = pymysql.connect(
+            host=RDS_HOST,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            database=DB_NAME,
+            port=RDS_PORT
+        )
+        cursor = connection.cursor()
+        # =========================
+        # GET FILES FROM S3
+        # ========================
+        response = s3.list_objects_v2(
+            Bucket=S3_BUCKET,
+            Prefix=S3_PREFIX
+        )
+        # =========================
+        # LOOP FILES
+        # =========================
+        for obj in response.get("Contents", []):
+            key = obj["Key"]
+            # อ่านเฉพาะไฟล์ part ของ Glue
+            if "part-" not in key:
+                continue
+            print(f"Reading file: {key}")
+            # =========================
+            # READ FILE FROM S3
+            # =========================
+            file_obj = s3.get_object(
+                Bucket=S3_BUCKET,
+                Key=key
+            )
+            csv_content = file_obj["Body"].read().decode("utf-8")
+            csv_reader = csv.DictReader(
+                StringIO(csv_content)
+            )
+            # =========================
+            # INSERT ROWS
+            # =========================
+            for row in csv_reader:
+                sql = f"""
+                INSERT INTO {TABLE_NAME}
+                (
+                    id,
+                    fl_date,
+                    op_unique_carrier,
+                    tail_num,
+                    origin,
+                    origin_city_name,
+                    dest,
+                    dest_city_name,
+                    dep_delay,
+                    arr_delay,
+                    cancelled,
+                    cancellation_code,
+                    carrier_delay,
+                    weather_delay,
+                    nas_delay,
+                    security_delay,
+                    late_aircraft_delay,
+                    dep_time,
+                    arr_time,
+                    crs_dep_time,
+                    crs_arr_time,
+                    calculated_dep_delay,
+                    calculated_arr_delay,
+                    dep_delay_flag,
+                    arr_delay_flag
+                )
+                VALUES (
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,%s
+                )
+                """
+                values = (
+                    row["id"],
+                    row["fl_date"],
+                    row["op_unique_carrier"],
+                    row["tail_num"],
+                    row["origin"],
+                    row["origin_city_name"],
+                    row["dest"],
+                    row["dest_city_name"],
+                    row["dep_delay"],
+                    row["arr_delay"],
+                    row["cancelled"],
+                    row["cancellation_code"],
+                    row["carrier_delay"],
+                    row["weather_delay"],
+                    row["nas_delay"],
+                    row["security_delay"],
+                    row["late_aircraft_delay"],
+                    row["dep_time"],
+                    row["arr_time"],
+                    row["crs_dep_time"],
+                    row["crs_arr_time"],
+                    row["calculated_dep_delay"],
+                    row["calculated_arr_delay"],
+                    row["dep_delay_flag"],
+                    row["arr_delay_flag"]
+                )
+                cursor.execute(sql, values)
+        connection.commit()
+        return {
+            "statusCode": 200,
+            "body": "Data inserted successfully"
+        }
+
+    except Exception as e:
+        print("ERROR:", str(e))
+        return {
+            "statusCode": 500,
+            "body": str(e)
+        }
+    finally:
+        if connection:
+            connection.close()

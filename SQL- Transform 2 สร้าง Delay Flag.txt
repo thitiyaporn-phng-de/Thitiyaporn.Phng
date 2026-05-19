@@ -1,0 +1,14 @@
+SELECT
+    *,
+    -- Delay flag
+    CASE
+        WHEN calculated_dep_delay > 0 THEN 1
+        ELSE 0
+    END AS dep_delay_flag,
+
+    CASE
+        WHEN calculated_arr_delay > 0 THEN 1
+        ELSE 0
+    END AS arr_delay_flag
+
+FROM myDataSource

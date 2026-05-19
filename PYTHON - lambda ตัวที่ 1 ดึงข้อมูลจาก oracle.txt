@@ -1,0 +1,44 @@
+import json
+import urllib.request
+import pandas as pd
+import boto3
+
+s3 = boto3.client("s3")
+
+BUCKET_NAME = "shipment-transections"
+
+URL = "https://g50ccea6c8bc805-shipmenttransection2.adb.ap-batam-1.oraclecloudapps.com/ords/shipment_transection/transection/"
+
+
+def lambda_handler(event, context):
+
+    # Call ORDS API
+    with urllib.request.urlopen(URL) as response:
+        data = json.loads(response.read().decode())
+
+    # Convert JSON to DataFrame
+    df = pd.DataFrame(data["items"])
+
+    # Convert large ID to string
+    df["id"] = df["id"].astype(str)
+
+    # Remove REST metadata
+    if "links" in df.columns:
+        df = df.drop(columns=["links"])
+
+    # Save parquet to Lambda temp storage
+    local_file = "/tmp/shipment_api.parquet"
+
+    df.to_parquet(local_file)
+
+    # Upload to S3
+    s3.upload_file(
+        local_file,
+        BUCKET_NAME,
+        "logs/shipment_api.parquet"
+    )
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps("Upload Success")
+    }

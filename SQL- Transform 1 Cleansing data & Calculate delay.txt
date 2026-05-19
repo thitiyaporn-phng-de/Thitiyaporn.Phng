@@ -1,0 +1,47 @@
+SELECT
+    id,
+
+    CAST(fl_date AS TIMESTAMP) AS fl_date,
+
+    op_unique_carrier,
+    tail_num,
+    origin,
+    origin_city_name,
+    dest,
+    dest_city_name,
+
+    dep_delay,
+    arr_delay,
+
+    cancelled,
+    cancellation_code,
+    
+    --เปลี่ยนค่า null เป็น 0
+    COALESCE(carrier_delay, 0) AS carrier_delay,
+    COALESCE(weather_delay, 0) AS weather_delay,
+    COALESCE(nas_delay, 0) AS nas_delay,
+    COALESCE(security_delay, 0) AS security_delay,
+    COALESCE(late_aircraft_delay, 0) AS late_aircraft_delay,
+    COALESCE(cancellation_code, '0') AS cancellation_code,
+
+    -- overwrite datatype
+    CAST(arr_time AS TIMESTAMP) AS arr_time,
+    CAST(crs_dep_time AS TIMESTAMP) AS crs_dep_time,
+    CAST(crs_arr_time AS TIMESTAMP) AS crs_arr_time,
+    CAST(dep_time AS TIMESTAMP) AS dep_time,
+
+
+    -- คำนวณ delay ใหม่
+    TIMESTAMPDIFF(
+        MINUTE,
+        CAST(crs_dep_time AS TIMESTAMP),
+        CAST(dep_time AS TIMESTAMP)
+    ) AS calculated_dep_delay,
+
+    TIMESTAMPDIFF(
+        MINUTE,
+        CAST(crs_arr_time AS TIMESTAMP),
+        CAST(arr_time AS TIMESTAMP)
+    ) AS calculated_arr_delay
+
+FROM myDataSource
