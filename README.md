@@ -4,7 +4,7 @@ stores raw data in Amazon S3, performs ETL using AWS Glue, loads clean data into
 and visualizes shipment insights in Microsoft Power BI
 
 ## Architecture
-
+![image_alt](https://github.com/thitiyaporn-phng-de/Thitiyaporn.Phng/blob/f6766af3ca1ef13282ce7ace84ba42e78967613a/Architecture.png)
 ## Project Workflow
 1. Shipment data is stored in Oracle Database.
 2. Amazon EventBridge triggers AWS Lambda on a schedule.
